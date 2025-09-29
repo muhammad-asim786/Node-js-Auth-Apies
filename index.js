@@ -1,13 +1,11 @@
 console.log('index.js called');
+require('dotenv').config();
 const app = require('./app');
 const mongoose = require('./config/db');
-const userModel = require('./model/users.model');
-const port = 3000;
 
-// app.get('/', (req, resp)=>{
-//     resp.send({message: 'app is working properly'})
-// })
+const PORT = process.env.PORT || 3000;
 
-app.listen(port, () => {
-    console.log(`Your listing on http://localhost:${port}`)
-  })
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+});

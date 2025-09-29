@@ -1,22 +1,43 @@
-console.log('users.controller.js called');  
-const { escape } = require('querystring');
-  const userService = require('../services/usres.services');
-  const bycrpt = require('bcrypt');
+console.log('users.controller.js called');
+const userService = require('../services/users.services');
+const bcrypt = require('bcrypt');
+const Joi = require('joi');
 
-  // check the server;
-  async function checkServer(req, res){
-    try {
-      res.send({message: 'Server is running properly'})
-    } catch (error) {
-      console.log(`this is your error ${error}`)
-      
-    }
+// Validation schemas
+const registerSchema = Joi.object({
+  username: Joi.string().alphanum().min(3).max(30).required(),
+  email: Joi.string().email().required(),
+  password: Joi.string().min(6).required()
+});
+
+const loginSchema = Joi.object({
+  email: Joi.string().email().required(),
+  password: Joi.string().required()
+});
+
+// Check server health
+async function checkServer(req, res) {
+  try {
+    res.status(200).json({ message: 'Server is running properly' });
+  } catch (error) {
+    console.error('Server check error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
+}
 // Controller function to handle user registration
 async function registerUser(req, res) {
-  const { username, email, password } = req.body;
-
   try {
+    // Validate input
+    const { error, value } = registerSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ 
+        message: 'Validation error', 
+        details: error.details.map(detail => detail.message) 
+      });
+    }
+
+    const { username, email, password } = value;
+
     // Check if the username or email already exists
     const existingUsername = await userService.findUserByUsername(username);
     const existingEmail = await userService.findUserByEmail(email);
@@ -31,29 +52,62 @@ async function registerUser(req, res) {
 
     // Create a new user
     const newUser = await userService.createUser({ username, email, password });
-    res.status(201).json({ message: 'User created successfully', user: newUser });
+    
+    // Remove password from response
+    const userResponse = {
+      _id: newUser._id,
+      username: newUser.username,
+      email: newUser.email,
+      createdAt: newUser.createdAt
+    };
+    
+    res.status(201).json({ message: 'User created successfully', user: userResponse });
   } catch (error) {
-    res.status(500).json({ message: `Error creating user: ${error.message}` });
+    console.error('Registration error:', error);
+    res.status(500).json({ message: 'Error creating user' });
   }
 }
 
-// login api;
-async function login(req, res){
-   const {email, password} = req.body;
-   try {
-    const user  = await userService.findUserByEmail(email);
-    if(!user){
-      return res.status(404).json({message: "User not found"});
+// Login API
+async function login(req, res) {
+  try {
+    // Validate input
+    const { error, value } = loginSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ 
+        message: 'Validation error', 
+        details: error.details.map(detail => detail.message) 
+      });
     }
-    const passwordMatch = await bycrpt.compare(password , user.password);
-    if(passwordMatch){
-      return res.status(200).json({message: 'Login successful'});
-    }else{
-      return res.status(404).json({message: 'Invalid credentials'});
+
+    const { email, password } = value;
+    
+    const user = await userService.findUserByEmail(email);
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
-   } catch (error) {
-    res.status(500).json({ message: `Error logging in: ${error.message}` });
-   }
+    
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (passwordMatch) {
+      // Remove password from response
+      const userResponse = {
+        _id: user._id,
+        username: user.username,
+        email: user.email,
+        createdAt: user.createdAt
+      };
+      
+      return res.status(200).json({ 
+        message: 'Login successful',
+        user: userResponse
+      });
+    } else {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Error logging in' });
+  }
 }
 
 

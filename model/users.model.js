@@ -1,6 +1,6 @@
-console.log('uses.model.js called');
+console.log('users.model.js called');
 const mongoose = require('mongoose');
-const bycrpt = require('bcrypt');
+const bcrypt = require('bcrypt');
 
 // Define the User Schema
 const userSchema = new mongoose.Schema({
@@ -24,18 +24,20 @@ const userSchema = new mongoose.Schema({
   }
 });
 
-// here you can user the bycrpt for prtectect the password;
+// Hash password before saving to database
 userSchema.pre('save', async function(next) {
   try {
-    const salt = await bycrpt.genSalt(10);
-    const hasPassword = await  bycrpt.hash(this.password, salt);
-    this.password = hasPassword;
+    // Only hash the password if it has been modified (or is new)
+    if (!this.isModified('password')) return next();
+    
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(this.password, salt);
+    this.password = hashedPassword;
     next();
   } catch (error) {
-    next(error)
-    
+    next(error);
   }
-})
+});
 
 // Create a User model based on the schema
 const User = mongoose.model('User', userSchema);
